@@ -10,7 +10,10 @@ The purpose of this project is to increase automation within Blink's (my cat) li
 Things to be determined:
 
 1. Do something with the other 2 hue lights
+1. Display cool messages on the OLED
+1. 
 
+### The controller will have the ability to be manually controlled ontop of the automatic triggers.
 
 ## Details
 
