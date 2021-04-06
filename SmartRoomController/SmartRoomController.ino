@@ -28,7 +28,7 @@ const int encoderPin_B = 15;      //encoder Pin B
 const int encoderPin_Switch = 21; //encoder Pin Switch 
 
 const int pixel_Pin = 17;         //NeoPixels Pin
-const int pixel_Count = 16;      //NeoPixels, total amount of NeoPixels
+const int pixel_Count = 16;       //NeoPixels, total amount of NeoPixels
 
 const int  keypad_Rows = 4;       //Keypad amount of rows
 const int  keypad_Cols = 4;       //Keypad amount of columns
@@ -47,6 +47,12 @@ const int ultrasonicPin_Echo = 16;//Ultrasonic Pin IN
 
 // *** Variables below ***
 
+bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
+
+int currentTime;                  //set to millis(), this is the time the code has been running
+
+int sonicRunTime;                 //Ultrasonic | the time different between sonicTime and currentTime
+int sonicTime;                    //Ultrasonic | a timestamp given after going through the ultrasonic IF statement
 
 // *** Defining objects for the header files below ***
 
@@ -59,32 +65,98 @@ Adafruit_BME280 bme;                                                      // for
 
 void setup() {
 
-  pinMode (ultrasonicPin_Ping, OUTPUT); //Ultrasonic Sensor | sending a signal out
-  pinMode (ultrasonicPin_Echo, INPUT);  //Ultrasonic Sensor | recieving a signal back
+  pinMode (ultrasonicPin_Ping, OUTPUT);                     //Ultrasonic Sensor | sending a signal out
+  pinMode (ultrasonicPin_Echo, INPUT);                      //Ultrasonic Sensor | recieving a signal back
   
   Serial.begin(9600);
+
+  button1.attachClick(oneClick);                           //Button | single click
+  button1.attachDoubleClick(doubleClick);                  //Button | double click
+  button1.attachLongPressStart(longPress);                 //Button | long click
+  button1.setClickTicks(250);                              //Button | knows the difference between a single click and a double click
+  button1.setPressTicks(1000);                             //Button | how long to be considered a long press  
+
+  delay(100);
+  Serial.printf("Starting OLED and BME ...\n");  
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_Address)) { //REQUIRED LINE FOR OLED TO BEGIN WITH HEX ADDRESS OF OLED, CHECKS IF WORKING
     Serial.printf("Error beginning display.\n");
     return;
   }
-    
+  else {
+    Serial.printf("Display has started successfully.\n");
+  }
+  display.setTextSize(2);                                   //OLED | Draw "2"X-scale text
+  display.setTextColor(SSD1306_WHITE);                      //OLED | setting text color  
+  
+  BMEstatus = bme.begin(BME_Address);                       //REQUIRED LINE TO BEGIN BME WITH HEX ADDRESS OF BME, CHECK IF WORKING BELOW
+  if (BMEstatus == false) {
+    Serial.printf("BME280 not detected. Check BME address and wiring.\n");
+  }
+  else {
+    Serial.printf("BME280 has been detected.\n");    
+  }
+
+  pixel.begin();                                            //REQUIRED LINE TO BEGIN PIXELS
+  pixel.show();
+
+  Serial.printf("Detecting ethernet link ...\n");
+  Ethernet.begin(mac);                                      //REQUIRED LINE TO BEGIN ETHERNET LINK
+  printIP();
+  Serial.printf("LinkStatus: %i  \n",Ethernet.linkStatus());
+
+  Serial.printf("Finished setup.\n");
 }
 
 void loop() {
 
+  currentTime = millis();
+  sonicRunTime = currentTime - sonicTime;
+  digitalWrite(ultrasonicPin_Ping, HIGH);
+//  if (digitalRead(ultrasonicPin_Echo) > 1 && sonicRunTime > 500) {
+    Serial.printf("Ultrasonic Sensor: Reading an object...");
+  digitalRead(ultrasonicPin_Echo);
+    Serial.printf("%i\n", digitalRead(ultrasonicPin_Echo));
+//    sonicTime = currentTime; 
+
+  
 
 }
 
 //******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING*******
 
-//one click function to turn current light on/off
+void oneClick() {
+//one click function to turn current light on/off 
+}
 
-//double click function to do something maybe?
+void doubleClick() {
+//double click function to manually turn on/off Weemo outlet
+}
 
+void longPress() {
 //long click function to change current light
+}
 
+int pMeterToBright() {
 //potentiometer read to brightness function
+}
 
-//display to led function
+void executeDisplay() { //this function is to display 
+  display.setCursor(0,0);
+  display.display(); //displaying  
+}
+void _clearDisplay() {
+  display.clearDisplay();
+  display.display();
+}
 
+void hueFlash() {
 //hueflash function to flash hues on and then off
+}
+
+void printIP() {
+  Serial.printf("My IP address: ");
+  for (byte thisByte = 0; thisByte < 3; thisByte++) {
+    Serial.printf("%i.",Ethernet.localIP()[thisByte]);
+  }
+  Serial.printf("%i\n",Ethernet.localIP()[3]);
+}
