@@ -110,16 +110,9 @@ void setup() {
 void loop() {
 
   currentTime = millis();
-  sonicRunTime = currentTime - sonicTime;
-  digitalWrite(ultrasonicPin_Ping, HIGH);
-//  if (digitalRead(ultrasonicPin_Echo) > 1 && sonicRunTime > 500) {
-    Serial.printf("Ultrasonic Sensor: Reading an object...");
-  digitalRead(ultrasonicPin_Echo);
-    Serial.printf("%i\n", digitalRead(ultrasonicPin_Echo));
-//    sonicTime = currentTime; 
-
+  isCatThere();
+  delay(100);
   
-
 }
 
 //******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING*******
@@ -159,4 +152,40 @@ void printIP() {
     Serial.printf("%i.",Ethernet.localIP()[thisByte]);
   }
   Serial.printf("%i\n",Ethernet.localIP()[3]);
+}
+
+bool isCatThere() {
+   
+  long duration, inches;
+  pinMode(ultrasonicPin_Ping, OUTPUT);
+  digitalWrite(ultrasonicPin_Ping, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ultrasonicPin_Ping, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(ultrasonicPin_Ping, LOW);
+  pinMode(ultrasonicPin_Echo, INPUT);
+  duration = pulseIn(ultrasonicPin_Echo, HIGH);
+  inches = microsecondsToInches(duration);
+
+  Serial.printf("in %i\n", inches);
+  if (inches > 1 && inches < 3) {               //Need "inch" less than distance to the wall and greater then the distance of the ultrasonic sensor to the cat litter box
+    Serial.printf("The cat is there!\n");
+    return true;
+  }
+  else {
+    Serial.printf("The cat is not there. :( \n");
+    return false;
+  }    
+    
+//  sonicRunTime = currentTime - sonicTime;
+//  ultrasonicSensing();
+//   if (in > 1 && inch < 2 && sonicRunTime > 500) {
+//   Serial.printf("Ultrasonic Sensor: Reading an object...");
+//   digitalRead(ultrasonicPin_Echo);
+//    Serial.printf("%i\n", digitalRead(ultrasonicPin_Echo));
+//    sonicTime = currentTime; 
+}
+
+long microsecondsToInches(long microseconds) {            //Ultrasonic Sensor | calculations found: https://www.tutorialspoint.com/arduino/arduino_ultrasonic_sensor.htm
+   return microseconds / 74 / 2;                          
 }
