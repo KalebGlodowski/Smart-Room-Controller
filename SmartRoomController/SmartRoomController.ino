@@ -55,6 +55,16 @@ const int potentiometerPin = 20;  //Potentiometer Pin IN
 
 // *** Variables below ***
 
+char hexaKeys [ROWS] [COLS] = {    //Keypad | array for the buttons
+  { '1', '2', '3', 'A'},
+  { '4', '5', '6', 'B'},
+  { '7', '8', '9', 'C'},
+  { '*', '0', '#', 'D'}
+}
+
+byte rowPins[ROWS] = {0, 1, 2, 3};//Keypad | pins being used for the rows
+byte colPins[COLS] = {4, 5, 6, 7};//Keypad | pins being used for the columns
+  
 bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
 int   tempC;                      //BME | celsius temperature
 float tempF;                      //BME | fahrenheit temperature converted from celsius
@@ -80,6 +90,11 @@ int saveBright;                   //Hue | saved brightness for hueflash
 int saveColor;                    //Hue | saved color for hueflash
 int i;                            //Hue | used in the hue for loop to light all 3 lights
 int previousColor;                //Hue | last hue color
+
+bool singleClickState;            //Button | a state that is changed with a single click
+bool doubleClickState;            //Button | a state that is changed with a double click
+bool longPressState;              //Button | a state that is changed with a long press
+
 
 // *** Defining objects for the header files below ***
 
@@ -151,6 +166,7 @@ void setup() {
 
 void loop() {
 
+  button1.tick();                                               //required for button to work
   currentTime = millis();
   
   if (isCatThere() == true && wemoOn == false) {                //turns on Wemo if cat is there
@@ -164,18 +180,49 @@ void loop() {
 
 }
 
-//******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING*******
+//******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING ||| DO THIS AT THE END*******
 
-void oneClick() {
-//one click function to turn current light on/off 
+void oneClick() {                                     //manually turn on/off the hue lights
+  singleClickState = !singleClickState;
+  Serial.printf("Button has been clicked a single time.\n");
+  if (singleClickState == true) {
+    Serial.printf("Single click on state.\n");    
+    hueStatus = true;
+    for (i=1; i <= 3; i++) {
+      setHue(i, hueStatus, hueColor, hueBright, 255);
+    }    
+  }
+  if (singleClickState == false) {
+    Serial.printf("Single click off state.\n");    
+    hueStatus = false;
+    for (i=1; i <= 3; i++) {
+      setHue(i, hueStatus, hueColor, hueBright, 255);
+    }    
+  }
 }
 
-void doubleClick() {
-//double click function to manually turn on/off Weemo outlet
+void doubleClick() {                                  //manually turn on/off the airfreshener + violet hue lights
+  Serial.printf("Button has been double clicked.");  
+  doubleClickState = !doubleClickState;
+  if (doubleClickState == true) {
+    Serial.printf("Double click on state.\n");
+    airFreshenerOn();
+  }
+  if (doubleClickState == false) {
+    Serial.printf("Double click off state.\n");
+    airFreshenerOff();
+  }
 }
 
 void longPress() {
-//long click function to change current light
+  //make something sweet happen on the OLED screen! But make sure it reverts back to whatever it was displaying last time
+  Serial.printf("Button has been long pressed.\n");    
+  longPressState = !longPressState;
+}
+
+bool keyLock {
+  bool keyState;
+  
 }
 
 void roomTempDetect() {                                   //detects the temperature in the room and lights the NeoPixels accordingly
