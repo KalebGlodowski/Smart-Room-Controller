@@ -79,6 +79,7 @@ bool hueStatus;                   //Hue | is hue light on?
 int saveBright;                   //Hue | saved brightness for hueflash
 int saveColor;                    //Hue | saved color for hueflash
 int i;                            //Hue | used in the hue for loop to light all 3 lights
+int previousColor;                //Hue | last hue color
 
 // *** Defining objects for the header files below ***
 
@@ -214,26 +215,29 @@ void roomTempDetect() {                                   //detects the temperat
 void hueFlash(int tempColor) {                            //Flashes the hue lights when the temperature changes
   saveBright = hueBright;
   saveColor = hueColor;
-  if (tempColor == red) {
+  if (tempColor == red && tempColor != previousColor) {   //put in tempColor != previousColor because we do not want to flash unless changing temperature colors
     hueBright = 255;
     hueColor = HueRed;
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
-    }           
+    }  
+    previousColor = tempColor;         
   }
-  if (tempColor == yellow) {
+  if (tempColor == yellow && tempColor != previousColor) {
     hueBright = 255;
     hueColor = HueYellow;
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
-    }          
+    }
+    previousColor = tempColor;              
   }    
-  if (tempColor == blue) {
+  if (tempColor == blue && tempColor != previousColor) {
     hueBright = 255;
     hueColor = HueBlue;
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
-    }          
+    } 
+    previousColor = tempColor;             
   }
   hueColor = saveColor;
   hueBright= saveBright;
