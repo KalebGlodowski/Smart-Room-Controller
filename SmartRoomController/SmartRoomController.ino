@@ -75,12 +75,9 @@ int potRead;                      //Potentiometer readings
 int hueBright;                    //Hue | light brightness level converted from potentiometer read
 int lastHueBright;                //Hue | last brightness
 int hueColor;                     //Hue | selected hue color
-int hueLight;                     //Hue | current hue light selected
 bool hueStatus;                   //Hue | is hue light on?
 int saveBright;                   //Hue | saved brightness for hueflash
 int saveColor;                    //Hue | saved color for hueflash
-int saveCurrentLight;             //Hue | saved current selected light for hueflash
-int saveHueStatus;                //Hue | save hue on/off status
 int i;                            //Hue | used in the hue for loop to light all 3 lights
 
 // *** Defining objects for the header files below ***
@@ -180,7 +177,7 @@ void longPress() {
 //long click function to change current light
 }
 
-void roomTempDetect() {
+void roomTempDetect() {                                   //detects the temperature in the room and lights the NeoPixels accordingly
   
   tempC = bme.readTemperature(); //reading temp in celsius
   tempF = ((tempC * 9/5) + 32);  //converting to fahrenheit
@@ -214,11 +211,9 @@ void roomTempDetect() {
   }
 }
 
-void hueFlash(int tempColor) {
+void hueFlash(int tempColor) {                            //Flashes the hue lights when the temperature changes
   saveBright = hueBright;
   saveColor = hueColor;
-//  saveCurrentLight = hueLight;
-//  saveHueOn = hueStatus;
   if (tempColor == red) {
     hueBright = 255;
     hueColor = HueRed;
@@ -242,11 +237,14 @@ void hueFlash(int tempColor) {
   }
   hueColor = saveColor;
   hueBright= saveBright;
-  delay(2000);
-  setHue(hueLight, hueStatus, hueColor, hueBright, 255);   //reverting back to previous hue settings
+  delay(3000);
+  for (i=1; i <= 3; i++) {  
+  setHue(i, hueStatus, hueColor, hueBright, 255);   //reverting back to previous hue settings
+  }
+  Serial.printf("The hues have been reset back to their original values prior to the hueFlash.\n");
 }
 
-int pMeterToBright() {                                     //converts potentiometer readings to brightness for the Hue Light
+int pMeterToBright() {                                    //converts potentiometer readings to brightness for the Hue Light
 
   potRead = analogRead(potentiometerPin);
   hueBright = map(potRead,0,1024,0,255);
@@ -257,17 +255,17 @@ int pMeterToBright() {                                     //converts potentiome
   return hueBright;
 }
 
-void executeDisplay() {                                    //this function is to display 
+void executeDisplay() {                                   //this function is to display 
   display.setCursor(0,0);
   display.display(); //displaying  
 }
 
-void _clearDisplay() {                                     //this function clears display
+void _clearDisplay() {                                    //this function clears display
   display.clearDisplay();
   display.display();
 }
 
-void airFreshenerOn() {
+void airFreshenerOn() {                                   //turns on the Weemo outlet and hue lights
   myWemo.switchON(selectWemo);    //Commenting out all Wemo functionality due to an error in the header file on line 23 completely stopping all code.
   delay(100);
   wemoOnTime = millis();
@@ -277,7 +275,7 @@ void airFreshenerOn() {
   Serial.printf("Wemo has turned on.\n");
   hueStatus = true;
   hueColor = HueViolet;
-  hueBright = 100;
+  hueBright = 80;
   for (i=1; i <= 3; i++) {
     setHue(i, hueStatus, hueColor, hueBright, 255);
   }   
@@ -285,7 +283,7 @@ void airFreshenerOn() {
   
 }
 
-void airFreshenerOff() {
+void airFreshenerOff() {                                  //turns off Weemo outlet and hue lights
   myWemo.switchOFF(selectWemo);  //Commenting out all Wemo functionality due to an error in the header file on line 23 completely stopping all code.
   delay(100);
   wemoOn = false;
@@ -299,7 +297,7 @@ void airFreshenerOff() {
   Serial.printf("Turning the lights off.\n");    
 }
 
-void printIP() {
+void printIP() {                                          //ensures ethernet is working properly and prints ip
   Serial.printf("My IP address: ");
   for (byte thisByte = 0; thisByte < 3; thisByte++) {
     Serial.printf("%i.",Ethernet.localIP()[thisByte]);
@@ -307,7 +305,7 @@ void printIP() {
   Serial.printf("%i\n",Ethernet.localIP()[3]);
 }
 
-bool isCatThere() {                                  //this function checks if cat is passing by the ultrasonic sensor                            
+bool isCatThere() {                                       //this function checks if cat is passing by the ultrasonic sensor                            
 
   static bool Status;                                //Local variable to determine true/false of the bool function
   digitalWrite(ultrasonicPin_Ping, LOW);
