@@ -44,15 +44,22 @@ const int OLED_Reset = -1;        //OLED reset to synchronize with teensy reset
 const int OLED_Address = 0x3C;    //OLED| this is OLED address
 
 const int BME_Address = 0x76;     //BME | this is BME address
+const char degree = 248;          //BME | degree symbol char
 
 const int ultrasonicPin_Ping = 8; //Ultrasonic Pin OUT
 const int ultrasonicPin_Echo = 16;//Ultrasonic Pin IN
 
 const int  selectWemo = 3;        //selects the 3rd Wemo within the Wemo header file. This is the only one I have.
 
+const int potentiometerPin = 20;  //Potentiometer Pin IN
+
 // *** Variables below ***
 
 bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
+int   tempC;                      //BME | celsius temperature
+float tempF;                      //BME | fahrenheit temperature converted from celsius
+int tempTime;                     //BME | timestamp when displaying temperature
+int lastTemp;                     //BME | last temperature reading
 
 int currentTime;                  //set to millis(), this is the time the code has been running
 
@@ -62,6 +69,19 @@ long inches;                      //Ultrasonic | inches from sensor
 
 bool wemoOn;                      //Wemo | Is the Wemo on?
 int wemoOnTime;                   //Wemo | Timestamp when the Weemo was turned on
+
+int potRead;                      //Potentiometer readings
+
+int hueBright;                    //Hue | light brightness level converted from potentiometer read
+int lastHueBright;                //Hue | last brightness
+int hueColor;                     //Hue | selected hue color
+int hueLight;                     //Hue | current hue light selected
+bool hueStatus;                   //Hue | is hue light on?
+int saveBright;                   //Hue | saved brightness for hueflash
+int saveColor;                    //Hue | saved color for hueflash
+int saveCurrentLight;             //Hue | saved current selected light for hueflash
+int saveHueStatus;                //Hue | save hue on/off status
+int i;                            //Hue | used in the hue for loop to light all 3 lights
 
 // *** Defining objects for the header files below ***
 
@@ -78,8 +98,15 @@ void setup() {
   pinMode (ultrasonicPin_Echo, INPUT);                      //Ultrasonic Sensor | recieving a signal back
   pinMode (encoderPin_R,OUTPUT);                            //Encoder Red LED   | outputting a command from the Teensy to the board
   pinMode (encoderPin_G,OUTPUT);                            //Encoder Green LED | ''
+  pinMode (potentiometerPin, INPUT);                        //Potentiometer     | recieving a reading of the position of the potentiometer
   Serial.begin(9600);
 
+  //Below are necessary includes to ensure Wemo works  
+  pinMode(10, OUTPUT);
+  digitalWrite(10, HIGH);
+  pinMode(4, OUTPUT);
+  digitalWrite(4, HIGH);
+  
   button1.attachClick(oneClick);                           //Button | single click
   button1.attachDoubleClick(doubleClick);                  //Button | double click
   button1.attachLongPressStart(longPress);                 //Button | long click
@@ -117,6 +144,10 @@ void setup() {
   myWemo.switchOFF(selectWemo);                             //Ensuring myWemo is off
   delay(1000);
   wemoOn = false;                                           //Establishing wemoOn is false
+  hueStatus = false;                                        //Ensuring hue lights are turned off
+  for (i=1; i <= 3; i++) {
+    setHue(i, hueStatus, hueColor, hueBright, 255);
+  }    
   Serial.printf("Finished setup.\n");
 }
 
@@ -130,6 +161,9 @@ void loop() {
   if ((currentTime - wemoOnTime) > 10000 && wemoOn == true) {   //turns off Wemo after 10 seconds of being on
     airFreshenerOff();  
   }
+  roomTempDetect();
+
+
 }
 
 //******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING*******
@@ -146,21 +180,91 @@ void longPress() {
 //long click function to change current light
 }
 
-int pMeterToBright() {
-//potentiometer read to brightness function
+void roomTempDetect() {
+  
+  tempC = bme.readTemperature(); //reading temp in celsius
+  tempF = ((tempC * 9/5) + 32);  //converting to fahrenheit
+  if ((currentTime - tempTime) > 10000 && tempF != lastTemp) {
+    Serial.printf("Room temperature is currently %f%c fahrenheit.\n", tempF, degree);   //Serial.print does not display degree character properly | this is normal.
+    pixel.clear();
+    pixel.show();
+    if (tempF >= 70) {
+      Serial.printf("Temperature is great than or equal to 70 degrees. Lighting pixels to red.\n");
+      pixel.fill(red, 0, pixel_Count);
+      pixel.setBrightness(30);
+      pixel.show();
+      hueFlash(red);
+    }
+    if (tempF < 65) {
+      Serial.printf("Temperature is less than 65 degrees. Lighting pixels to blue.\n");
+      pixel.fill(blue, 0, pixel_Count);
+      pixel.setBrightness(30);
+      pixel.show();
+      hueFlash(blue);      
+    }
+    if (tempF >= 65 && tempF < 70) {
+      Serial.printf("Temperature is greater than or equal to 65 and less than 70. Lighting pixels to yellow.\n");      
+      pixel.fill(maize, 0, pixel_Count);
+      pixel.setBrightness(30);
+      pixel.show();
+      hueFlash(yellow);
+    }
+    lastTemp = tempF;
+    tempTime = millis();    
+  }
+}
+
+void hueFlash(int tempColor) {
+  saveBright = hueBright;
+  saveColor = hueColor;
+//  saveCurrentLight = hueLight;
+//  saveHueOn = hueStatus;
+  if (tempColor == red) {
+    hueBright = 255;
+    hueColor = HueRed;
+    for (i=1; i <= 3; i++) {
+      setHue(i, true, hueColor, hueBright, 255);
+    }           
+  }
+  if (tempColor == yellow) {
+    hueBright = 255;
+    hueColor = HueYellow;
+    for (i=1; i <= 3; i++) {
+      setHue(i, true, hueColor, hueBright, 255);
+    }          
+  }    
+  if (tempColor == blue) {
+    hueBright = 255;
+    hueColor = HueBlue;
+    for (i=1; i <= 3; i++) {
+      setHue(i, true, hueColor, hueBright, 255);
+    }          
+  }
+  hueColor = saveColor;
+  hueBright= saveBright;
+  delay(2000);
+  setHue(hueLight, hueStatus, hueColor, hueBright, 255);   //reverting back to previous hue settings
+}
+
+int pMeterToBright() {                                     //converts potentiometer readings to brightness for the Hue Light
+
+  potRead = analogRead(potentiometerPin);
+  hueBright = map(potRead,0,1024,0,255);
+  if (hueBright != lastHueBright) {                               //ensures only printing brightness when it changes
+    Serial.printf("Brightness changed to: %i.\n", hueBright);
+    lastHueBright = hueBright; 
+  }
+  return hueBright;
 }
 
 void executeDisplay() {                                    //this function is to display 
   display.setCursor(0,0);
   display.display(); //displaying  
 }
+
 void _clearDisplay() {                                     //this function clears display
   display.clearDisplay();
   display.display();
-}
-
-void hueFlash() {
-//hueflash function to flash hues on and then off
 }
 
 void airFreshenerOn() {
@@ -168,14 +272,31 @@ void airFreshenerOn() {
   delay(100);
   wemoOnTime = millis();
   wemoOn = true; 
+  digitalWrite(encoderPin_R, LOW);              //Encoder | turning red LED off
+  digitalWrite(encoderPin_G, HIGH);             //Encoder | turning green LED on
   Serial.printf("Wemo has turned on.\n");
+  hueStatus = true;
+  hueColor = HueViolet;
+  hueBright = 100;
+  for (i=1; i <= 3; i++) {
+    setHue(i, hueStatus, hueColor, hueBright, 255);
+  }   
+  Serial.printf("Turning on the lights for the cat.");
+  
 }
 
 void airFreshenerOff() {
   myWemo.switchOFF(selectWemo);  //Commenting out all Wemo functionality due to an error in the header file on line 23 completely stopping all code.
   delay(100);
   wemoOn = false;
-  Serial.printf("Wemo has turned off.\n");    
+  digitalWrite(encoderPin_R, HIGH);              //Encoder | turning red LED on
+  digitalWrite(encoderPin_G, LOW);               //Encoder | turning green LED off  
+  Serial.printf("Wemo has turned off.\n");
+  hueStatus = false;
+  for (i=1; i <= 3; i++) {
+    setHue(i, hueStatus, hueColor, hueBright, 255);
+  }  
+  Serial.printf("Turning the lights off.\n");    
 }
 
 void printIP() {
@@ -186,9 +307,9 @@ void printIP() {
   Serial.printf("%i\n",Ethernet.localIP()[3]);
 }
 
-bool isCatThere() {                                       //this function checks if cat is passing by the ultrasonic sensor                            
+bool isCatThere() {                                  //this function checks if cat is passing by the ultrasonic sensor                            
 
-  static bool Status;                               //
+  static bool Status;                                //Local variable to determine true/false of the bool function
   digitalWrite(ultrasonicPin_Ping, LOW);
   delayMicroseconds(2);
   digitalWrite(ultrasonicPin_Ping, HIGH);
@@ -197,15 +318,20 @@ bool isCatThere() {                                       //this function checks
   duration = pulseIn(ultrasonicPin_Echo, HIGH);
   inches = microsecondsToInches(duration);
   if ((currentTime - lastSonicTime) > 1000) {       //Only prints if the cat is there every X miliseconds
-    Serial.printf("Reading inches: %i\n", inches);
     if (inches < 3) {                               //Need "inch" less than distance to the wall
+      if (Status != true) {                         //included to only send the Serial.print one time when status changes
       Serial.printf("The cat is there!\n");
-      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime);     
+      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime);      
+      Serial.printf("Reading inches: %i\n", inches);
+      }
       Status = true;
     }
     else {
+      if (Status != false) {                        //included to only send the Serial.print one time when status changes
       Serial.printf("The cat is not there. :( \n");
-      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime);
+      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime); 
+      Serial.printf("Reading inches: %i\n", inches);             
+      }
       Status = false;
     }
     lastSonicTime = millis();
