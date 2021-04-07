@@ -20,12 +20,15 @@
 #include "colors.h"           //for NexPixels | custom colors from Brian
 #include <Keypad.h>           //for Keypad
 #include <PWMServo.h>         //for Keypad
+#include <wemo.h>             //for Wemo
 
 // *** Declaring all constants below ***
 
 const int encoderPin_A = 14;      //encoder Pin A
 const int encoderPin_B = 15;      //encoder Pin B
 const int encoderPin_Switch = 21; //encoder Pin Switch 
+const int encoderPin_G = 22;      //encoder Pin Green
+const int encoderPin_R = 23;      //encoder Pin Red
 
 const int pixel_Pin = 17;         //NeoPixels Pin
 const int pixel_Count = 16;       //NeoPixels, total amount of NeoPixels
@@ -45,14 +48,20 @@ const int BME_Address = 0x76;     //BME | this is BME address
 const int ultrasonicPin_Ping = 8; //Ultrasonic Pin OUT
 const int ultrasonicPin_Echo = 16;//Ultrasonic Pin IN
 
+const int  selectWemo = 3;        //selects the 3rd Wemo within the Wemo header file. This is the only one I have.
+
 // *** Variables below ***
 
 bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
 
 int currentTime;                  //set to millis(), this is the time the code has been running
 
-int sonicRunTime;                 //Ultrasonic | the time different between sonicTime and currentTime
-int sonicTime;                    //Ultrasonic | a timestamp given after going through the ultrasonic IF statement
+int lastSonicTime;                //Ultrasonic | a timestamp given after going through the ultrasonic IF statement
+long duration;                    //Ultrasonic | duration
+long inches;                      //Ultrasonic | inches from sensor
+
+bool wemoOn;                      //Wemo | Is the Wemo on?
+int wemoOnTime;                   //Wemo | Timestamp when the Weemo was turned on
 
 // *** Defining objects for the header files below ***
 
@@ -60,14 +69,15 @@ OneButton button1 (encoderPin_Switch, true, true);                        //for 
 Encoder myEnc (encoderPin_A, encoderPin_B);                               //for Encoder
 Adafruit_SSD1306 display(screen_Width, screen_Height, &Wire, OLED_Reset); //for OLED
 Adafruit_NeoPixel pixel (pixel_Count, pixel_Pin, NEO_GRB + NEO_KHZ800);   //for NeoPixels
-Adafruit_BME280 bme;                                                      // for BME
-
+Adafruit_BME280 bme;                                                      //for BME
+Wemo myWemo;                                                              //for Wemo
 
 void setup() {
 
   pinMode (ultrasonicPin_Ping, OUTPUT);                     //Ultrasonic Sensor | sending a signal out
   pinMode (ultrasonicPin_Echo, INPUT);                      //Ultrasonic Sensor | recieving a signal back
-  
+  pinMode (encoderPin_R,OUTPUT);                            //Encoder Red LED   | outputting a command from the Teensy to the board
+  pinMode (encoderPin_G,OUTPUT);                            //Encoder Green LED | ''
   Serial.begin(9600);
 
   button1.attachClick(oneClick);                           //Button | single click
@@ -103,16 +113,23 @@ void setup() {
   Ethernet.begin(mac);                                      //REQUIRED LINE TO BEGIN ETHERNET LINK
   printIP();
   Serial.printf("LinkStatus: %i  \n",Ethernet.linkStatus());
-
+  
+  myWemo.switchOFF(selectWemo);                             //Ensuring myWemo is off
+  delay(1000);
+  wemoOn = false;                                           //Establishing wemoOn is false
   Serial.printf("Finished setup.\n");
 }
 
 void loop() {
 
   currentTime = millis();
-  isCatThere();
-  delay(100);
   
+  if (isCatThere() == true && wemoOn == false) {                //turns on Wemo if cat is there
+    airFreshenerOn();
+  }
+  if ((currentTime - wemoOnTime) > 10000 && wemoOn == true) {   //turns off Wemo after 10 seconds of being on
+    airFreshenerOff();  
+  }
 }
 
 //******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING*******
@@ -133,17 +150,32 @@ int pMeterToBright() {
 //potentiometer read to brightness function
 }
 
-void executeDisplay() { //this function is to display 
+void executeDisplay() {                                    //this function is to display 
   display.setCursor(0,0);
   display.display(); //displaying  
 }
-void _clearDisplay() {
+void _clearDisplay() {                                     //this function clears display
   display.clearDisplay();
   display.display();
 }
 
 void hueFlash() {
 //hueflash function to flash hues on and then off
+}
+
+void airFreshenerOn() {
+  myWemo.switchON(selectWemo);    //Commenting out all Wemo functionality due to an error in the header file on line 23 completely stopping all code.
+  delay(100);
+  wemoOnTime = millis();
+  wemoOn = true; 
+  Serial.printf("Wemo has turned on.\n");
+}
+
+void airFreshenerOff() {
+  myWemo.switchOFF(selectWemo);  //Commenting out all Wemo functionality due to an error in the header file on line 23 completely stopping all code.
+  delay(100);
+  wemoOn = false;
+  Serial.printf("Wemo has turned off.\n");    
 }
 
 void printIP() {
@@ -154,37 +186,32 @@ void printIP() {
   Serial.printf("%i\n",Ethernet.localIP()[3]);
 }
 
-bool isCatThere() {
-   
-  long duration, inches;
-  pinMode(ultrasonicPin_Ping, OUTPUT);
+bool isCatThere() {                                       //this function checks if cat is passing by the ultrasonic sensor                            
+
+  static bool Status;                               //
   digitalWrite(ultrasonicPin_Ping, LOW);
   delayMicroseconds(2);
   digitalWrite(ultrasonicPin_Ping, HIGH);
   delayMicroseconds(10);
   digitalWrite(ultrasonicPin_Ping, LOW);
-  pinMode(ultrasonicPin_Echo, INPUT);
   duration = pulseIn(ultrasonicPin_Echo, HIGH);
   inches = microsecondsToInches(duration);
-
-  Serial.printf("in %i\n", inches);
-  if (inches > 1 && inches < 3) {               //Need "inch" less than distance to the wall and greater then the distance of the ultrasonic sensor to the cat litter box
-    Serial.printf("The cat is there!\n");
-    return true;
+  if ((currentTime - lastSonicTime) > 1000) {       //Only prints if the cat is there every X miliseconds
+    Serial.printf("Reading inches: %i\n", inches);
+    if (inches < 3) {                               //Need "inch" less than distance to the wall
+      Serial.printf("The cat is there!\n");
+      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime);     
+      Status = true;
+    }
+    else {
+      Serial.printf("The cat is not there. :( \n");
+      Serial.printf("Setting lastSonicTime to: %i\n", lastSonicTime);
+      Status = false;
+    }
+    lastSonicTime = millis();
   }
-  else {
-    Serial.printf("The cat is not there. :( \n");
-    return false;
-  }    
-    
-//  sonicRunTime = currentTime - sonicTime;
-//  ultrasonicSensing();
-//   if (in > 1 && inch < 2 && sonicRunTime > 500) {
-//   Serial.printf("Ultrasonic Sensor: Reading an object...");
-//   digitalRead(ultrasonicPin_Echo);
-//    Serial.printf("%i\n", digitalRead(ultrasonicPin_Echo));
-//    sonicTime = currentTime; 
-}
+  return Status;
+}          
 
 long microsecondsToInches(long microseconds) {            //Ultrasonic Sensor | calculations found: https://www.tutorialspoint.com/arduino/arduino_ultrasonic_sensor.htm
    return microseconds / 74 / 2;                          
