@@ -20,7 +20,7 @@
 #include "colors.h"           //for NexPixels | custom colors from Brian
 #include <Keypad.h>           //for Keypad
 #include <PWMServo.h>         //for Keypad
-#include <wemo.h>             //for Wemo
+#include "wemo.h"             //for Wemo
 
 // *** Declaring all constants below ***
 
