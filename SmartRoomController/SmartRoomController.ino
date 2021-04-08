@@ -68,7 +68,7 @@ char s;                                           //Keypad | "s" is the spot the
 char keySequence[passLength];                     //Keypad | this is the code that the user has entered so far, will only go on to the nex character if correct
 bool resetPosition;                               //Keypad | resetting the "s", reverting the user back to s=0, also known as position 1
 bool keyState;                                    //Keypad | state of whether key is locked or unlocked
-
+bool isLocked;                                    //Keypad | necessary to not have OLED spamming/flickering. This will be set true when locked, and turned false when unlocked.
   
 bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
 int   tempC;                      //BME | celsius temperature
@@ -148,6 +148,7 @@ void setup() {
   else {
     Serial.printf("Display has started successfully.\n");
   }
+  _clearDisplay();
   display.setTextSize(2);                                   //OLED | Draw "2"X-scale text
   display.setTextColor(SSD1306_WHITE);                      //OLED | setting text color  
   
@@ -169,7 +170,7 @@ void setup() {
   
   myWemo.switchOFF(selectWemo);                             //Ensuring myWemo is off
   delay(1000);
-  wemoOn = false;                                           //Establishing wemoOn is false
+  wemoOn = false;                                           //Ensuring wemoOn is false
   hueStatus = false;                                        //Ensuring hue lights are turned off
   for (i=1; i <= 3; i++) {
     setHue(i, hueStatus, hueColor, hueBright, 255);
@@ -297,11 +298,28 @@ bool isKeyUnlocked () {                                   //keypad lock and unlo
   if (keySequence[3] == keyCode[3]) {
     if (keyState == false) {
       Serial.printf("Password has been entered corrrect. User input is unlocked.\n");
+      _clearDisplay();
+      display.setTextSize(1); // Draw 1X-scale text      
+      display.printf("All user input is currently:\n");
+      display.setTextSize(3); // Draw 3X-scale text
+      display.printf("UNLOCKED!");
+      executeDisplay(); 
       keyState = true; //this is put in place to keep the above line from spamming
+      isLocked = false;
     }
     return true;  //returns a true for the isKeyLocked function
   }
   else {
+    if (isLocked != true) {
+     _clearDisplay();
+    display.setTextSize(1); // Draw 1X-scale text      
+    display.printf("All user input is currently:\n");
+    display.setTextSize(3); // Draw 3X-scale text
+    display.printf("LOCKED!");
+    executeDisplay();
+    isLocked = true;     
+    }
+    
     return false; //returns a false for the isKeyLocked function
   }
 }
