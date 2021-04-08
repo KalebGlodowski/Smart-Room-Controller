@@ -19,7 +19,6 @@
 #include <Adafruit_NeoPixel.h>//for NexPixels
 #include "colors.h"           //for NexPixels | custom colors from Brian
 #include <Keypad.h>           //for Keypad
-#include <PWMServo.h>         //for Keypad
 #include "wemo.h"             //for Wemo
 
 // *** Declaring all constants below ***
@@ -35,8 +34,8 @@ const int pixel_Count = 16;       //NeoPixels, total amount of NeoPixels
 
 const int  keypad_Rows = 4;       //Keypad amount of rows
 const int  keypad_Cols = 4;       //Keypad amount of columns
-const char keypad_PassCode = 9496;//Keypad passcode to gain access
-const int  keypad_PassLength = 4; //Keypad passcode character length
+const int  passLength = 4;        //Keypad passcode character length
+const char lockKey = '#';         //Keypad button to lcok the keypad 
 
 const int screen_Width = 128;     //OLED display width, in pixels
 const int screen_Height = 64;     //OLED display height, in pixels
@@ -55,15 +54,21 @@ const int potentiometerPin = 20;  //Potentiometer Pin IN
 
 // *** Variables below ***
 
-char hexaKeys [ROWS] [COLS] = {    //Keypad | array for the buttons
+char hexaKeys [keypad_Rows] [keypad_Cols] = {     //Keypad | array for the buttons
   { '1', '2', '3', 'A'},
   { '4', '5', '6', 'B'},
   { '7', '8', '9', 'C'},
   { '*', '0', '#', 'D'}
-}
+};
+char keyCode[passLength] = {'9', '4', '9', '6'};  //Keypad | passcode
+byte rowPins[keypad_Rows] = {0, 1, 2, 3};         //Keypad | pins being used for the rows
+byte colPins[keypad_Cols] = {4, 5, 6, 7};         //Keypad | pins being used for the columns
+char keypadInput;                                 //Keypad | user input to the keypad
+char s;                                           //Keypad | "s" is the spot the user is inputing a key for. ie: 0 is spot 1, 1 is spot 2, ect.
+char keySequence[passLength];                     //Keypad | this is the code that the user has entered so far, will only go on to the nex character if correct
+bool resetPosition;                               //Keypad | resetting the "s", reverting the user back to s=0, also known as position 1
+bool keyState;                                    //Keypad | state of whether key is locked or unlocked
 
-byte rowPins[ROWS] = {0, 1, 2, 3};//Keypad | pins being used for the rows
-byte colPins[COLS] = {4, 5, 6, 7};//Keypad | pins being used for the columns
   
 bool BMEstatus;                   //BME | true/false variable set to BME's start status whether it is on or not.
 int   tempC;                      //BME | celsius temperature
@@ -90,6 +95,8 @@ int saveBright;                   //Hue | saved brightness for hueflash
 int saveColor;                    //Hue | saved color for hueflash
 int i;                            //Hue | used in the hue for loop to light all 3 lights
 int previousColor;                //Hue | last hue color
+int hueSelect[] = 
+{HueOrange, HueYellow,HueViolet}; //Hue | 3 colors to switch between utilizing the longPress
 
 bool singleClickState;            //Button | a state that is changed with a single click
 bool doubleClickState;            //Button | a state that is changed with a double click
@@ -98,12 +105,13 @@ bool longPressState;              //Button | a state that is changed with a long
 
 // *** Defining objects for the header files below ***
 
-OneButton button1 (encoderPin_Switch, true, true);                        //for Button
-Encoder myEnc (encoderPin_A, encoderPin_B);                               //for Encoder
-Adafruit_SSD1306 display(screen_Width, screen_Height, &Wire, OLED_Reset); //for OLED
-Adafruit_NeoPixel pixel (pixel_Count, pixel_Pin, NEO_GRB + NEO_KHZ800);   //for NeoPixels
-Adafruit_BME280 bme;                                                      //for BME
-Wemo myWemo;                                                              //for Wemo
+OneButton button1 (encoderPin_Switch, true, true);                                //for Button
+Encoder myEnc (encoderPin_A, encoderPin_B);                                       //for Encoder
+Adafruit_SSD1306 display(screen_Width, screen_Height, &Wire, OLED_Reset);         //for OLED
+Adafruit_NeoPixel pixel (pixel_Count, pixel_Pin, NEO_GRB + NEO_KHZ800);           //for NeoPixels
+Adafruit_BME280 bme;                                                              //for BME
+Wemo myWemo;                                                                      //for Wemo
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, keypad_Rows, keypad_Cols); //for Keypad
 
 void setup() {
 
@@ -176,53 +184,96 @@ void loop() {
     airFreshenerOff();  
   }
   roomTempDetect();
-
+  keypadInput = customKeypad.getKey();
+  isKeyUnlocked();
 
 }
 
-//******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" IMMEDIATELY FOLLOWING ||| DO THIS AT THE END*******
+//******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" PRIOR TO ANY CODE ||| DO THIS AT THE END*******
 
 void oneClick() {                                     //manually turn on/off the hue lights
-  singleClickState = !singleClickState;
-  Serial.printf("Button has been clicked a single time.\n");
-  if (singleClickState == true) {
-    Serial.printf("Single click on state.\n");    
-    hueStatus = true;
-    for (i=1; i <= 3; i++) {
-      setHue(i, hueStatus, hueColor, hueBright, 255);
-    }    
-  }
-  if (singleClickState == false) {
-    Serial.printf("Single click off state.\n");    
-    hueStatus = false;
-    for (i=1; i <= 3; i++) {
-      setHue(i, hueStatus, hueColor, hueBright, 255);
+  if (isKeyUnlocked() == true) {
+    singleClickState = !singleClickState;
+    Serial.printf("Button has been clicked a single time.\n");
+    if (singleClickState == true) {
+      Serial.printf("Single click on state.\n");    
+      hueStatus = true;
+      for (i=1; i <= 3; i++) {
+        setHue(i, hueStatus, hueColor, hueBright, 255);
+      }    
+    }
+    if (singleClickState == false) {
+      Serial.printf("Single click off state.\n");    
+      hueStatus = false;
+      for (i=1; i <= 3; i++) {
+        setHue(i, hueStatus, hueColor, hueBright, 255);
+      }    
     }    
   }
 }
 
 void doubleClick() {                                  //manually turn on/off the airfreshener + violet hue lights
-  Serial.printf("Button has been double clicked.");  
-  doubleClickState = !doubleClickState;
-  if (doubleClickState == true) {
-    Serial.printf("Double click on state.\n");
-    airFreshenerOn();
-  }
-  if (doubleClickState == false) {
-    Serial.printf("Double click off state.\n");
-    airFreshenerOff();
+  if (isKeyUnlocked() == true) {  
+    Serial.printf("Button has been double clicked.\n");  
+    doubleClickState = !doubleClickState;
+    if (doubleClickState == true) {
+      Serial.printf("Double click on state.\n");
+      airFreshenerOn();
+    }
+    if (doubleClickState == false) {
+      Serial.printf("Double click off state.\n");
+      airFreshenerOff();
+    }
   }
 }
 
 void longPress() {
-  //make something sweet happen on the OLED screen! But make sure it reverts back to whatever it was displaying last time
-  Serial.printf("Button has been long pressed.\n");    
-  longPressState = !longPressState;
+  if (isKeyUnlocked() == true) {
+    //make something sweet happen on the OLED screen! But make sure it reverts back to whatever it was displaying last time
+    Serial.printf("Button has been long pressed.\n");    
+    longPressState = !longPressState;
+  }
 }
 
-bool keyLock {
-  bool keyState;
-  
+bool isKeyUnlocked () {
+  if (resetPosition == true) {
+    s = 0;
+  }
+  if (keypadInput == lockKey && keyState == true) {                             //this gives the keypad a functionality of being re-locked after being locked
+    keyState = false;
+    keySequence[3] = NULL; //resetting the keySequence
+    keySequence[2] = NULL;
+    keySequence[1] = NULL;
+    keySequence[0] = NULL;
+    resetPosition = true; //resetting position back to 1
+    Serial.printf("Key # pressed. Locking keypad.\n");
+    Serial.printf("To access user input features, please re-enter the passcode.\n");
+    return false;
+  }
+  if (keypadInput && keyState == false) {                                       //this is the main keycode if function that compares user input char to keyCode
+    Serial.printf("Key %c has been pressed.\n", keypadInput);
+    Serial.printf("Currently entering character in the %i position.\n", (s+1)); //s+1 because first place would show a 0 and we want the user to see a 1
+    if (keyCode[s] == keypadInput) {
+      Serial.printf("Position %i key unlocked.\n", (s+1));
+      keySequence[s] = keypadInput;
+      resetPosition = false;
+    }
+    else {
+      resetPosition = true;
+      Serial.printf("Password incorrect for position %i. Resetting.\n", (s+1));
+    }
+    s = s+1;
+  }
+  if (keySequence[3] == keyCode[3]) {
+    if (keyState == false) {
+      Serial.printf("Password has been entered corrrect. User input is unlocked.\n");
+      keyState = true; //this is put in place to keep the above line from spamming
+    }
+    return true;  //returns a true for the isKeyLocked function
+  }
+  else {
+    return false; //returns a false for the isKeyLocked function
+  }
 }
 
 void roomTempDetect() {                                   //detects the temperature in the room and lights the NeoPixels accordingly
@@ -296,14 +347,15 @@ void hueFlash(int tempColor) {                            //Flashes the hue ligh
 }
 
 int pMeterToBright() {                                    //converts potentiometer readings to brightness for the Hue Light
-
-  potRead = analogRead(potentiometerPin);
-  hueBright = map(potRead,0,1024,0,255);
-  if (hueBright != lastHueBright) {                               //ensures only printing brightness when it changes
-    Serial.printf("Brightness changed to: %i.\n", hueBright);
-    lastHueBright = hueBright; 
+  if (isKeyUnlocked() == true) {
+    potRead = analogRead(potentiometerPin);
+    hueBright = map(potRead,0,1024,0,255);
+    if (hueBright != lastHueBright) {                               //ensures only printing brightness when it changes
+      Serial.printf("Brightness changed to: %i.\n", hueBright);
+      lastHueBright = hueBright; 
+    }
+    return hueBright;
   }
-  return hueBright;
 }
 
 void executeDisplay() {                                   //this function is to display 
