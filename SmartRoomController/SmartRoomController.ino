@@ -93,15 +93,20 @@ int hueColor;                     //Hue | selected hue color
 bool hueStatus;                   //Hue | is hue light on?
 int saveBright;                   //Hue | saved brightness for hueflash
 int saveColor;                    //Hue | saved color for hueflash
+bool needHueRestore;              //Hue | restores to saved hue settings
 int i;                            //Hue | used in the hue for loop to light all 3 lights
 int previousColor;                //Hue | last hue color
-int hueSelect[] = 
-{HueOrange, HueYellow,HueViolet}; //Hue | 3 colors to switch between utilizing the longPress
+int hueColorSelect[] = 
+{HueOrange, HueYellow, HueViolet};//Hue | 3 colors to switch between utilizing the longPress
+int c;                            //Hue | c is the color within the hueSelect, can be between 0 and 2
+int hueSaturation;                //Hue | saturation level which is set manually via turning the encoder
 
 bool singleClickState;            //Button | a state that is changed with a single click
 bool doubleClickState;            //Button | a state that is changed with a double click
 bool longPressState;              //Button | a state that is changed with a long press
 
+int lastPosition;                 //Encoder | remembering last position of encoder
+int encPosition;                  //Encoder | current position of encoder
 
 // *** Defining objects for the header files below ***
 
@@ -175,8 +180,7 @@ void setup() {
 void loop() {
 
   button1.tick();                                               //required for button to work
-  currentTime = millis();
-  
+  currentTime = millis();  
   if (isCatThere() == true && wemoOn == false) {                //turns on Wemo if cat is there
     airFreshenerOn();
   }
@@ -184,14 +188,13 @@ void loop() {
     airFreshenerOff();  
   }
   roomTempDetect();
-  keypadInput = customKeypad.getKey();
   isKeyUnlocked();
-
+  encoderTurn();  
 }
 
-//******* ALL USER INPUT FUNCTIONS SHOULD HAVE AN "IF UNLOCKED" PRIOR TO ANY CODE ||| DO THIS AT THE END*******
+//******* ALL USER INPUT FUNCTIONS HAVE AN "IF UNLOCKED" PRIOR TO ANY CODE ||| KEYPAD MUST BE USED TO UNLOCK FIRST*******
 
-void oneClick() {                                     //manually turn on/off the hue lights
+void oneClick() {                                         //manually turn on/off the hue lights
   if (isKeyUnlocked() == true) {
     singleClickState = !singleClickState;
     Serial.printf("Button has been clicked a single time.\n");
@@ -199,20 +202,20 @@ void oneClick() {                                     //manually turn on/off the
       Serial.printf("Single click on state.\n");    
       hueStatus = true;
       for (i=1; i <= 3; i++) {
-        setHue(i, hueStatus, hueColor, hueBright, 255);
+        setHue(i, hueStatus, hueColorSelect[c], hueBright, hueSaturation);
       }    
     }
     if (singleClickState == false) {
       Serial.printf("Single click off state.\n");    
       hueStatus = false;
       for (i=1; i <= 3; i++) {
-        setHue(i, hueStatus, hueColor, hueBright, 255);
+        setHue(i, hueStatus, hueColorSelect[c], hueBright, hueSaturation);
       }    
     }    
   }
 }
 
-void doubleClick() {                                  //manually turn on/off the airfreshener + violet hue lights
+void doubleClick() {                                      //manually turn on/off the airfreshener + violet hue lights
   if (isKeyUnlocked() == true) {  
     Serial.printf("Button has been double clicked.\n");  
     doubleClickState = !doubleClickState;
@@ -227,15 +230,42 @@ void doubleClick() {                                  //manually turn on/off the
   }
 }
 
-void longPress() {
+void longPress() {                                        //manually change the color of the hue lights
   if (isKeyUnlocked() == true) {
     //make something sweet happen on the OLED screen! But make sure it reverts back to whatever it was displaying last time
     Serial.printf("Button has been long pressed.\n");    
     longPressState = !longPressState;
+    if (longPressState == true) {
+      c = c + 1;   //c represents the spot in the array for hueColorSelect
+      if (c > 2) { //c can only be 0, 1, or 2
+        c = 0;
+      }      
+    }
   }
 }
 
-bool isKeyUnlocked () {
+void encoderTurn() {                                      //manually change the saturation levels of the hue
+  if (isKeyUnlocked() == true) {
+    encPosition = myEnc.read();
+    if (lastPosition != encPosition) {
+      Serial.printf("The current encoder positin is: %i.\n", encPosition);
+      if (encPosition < 0) {
+        encPosition = 0;
+        Serial.printf("encPosition being set to 0. Do not try to turn below 0.");
+      }
+      if (encPosition >= 128) {
+        encPosition = 127;
+        Serial.printf("encPosition being set to 127. Do not try to go beyond 127.");
+      }
+      hueSaturation = map(encPosition,0,127,0,255);
+      Serial.printf("The current hue saturation is: %i.\n", hueSaturation);
+      lastPosition = encPosition;
+    }  
+  }
+}
+
+bool isKeyUnlocked () {                                   //keypad lock and unlock function
+  keypadInput = customKeypad.getKey();  //establishes user input  
   if (resetPosition == true) {
     s = 0;
   }
@@ -319,7 +349,9 @@ void hueFlash(int tempColor) {                            //Flashes the hue ligh
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
     }  
-    previousColor = tempColor;         
+    previousColor = tempColor;
+    Serial.printf("Flashing red.\n");
+    needHueRestore = true;               
   }
   if (tempColor == yellow && tempColor != previousColor) {
     hueBright = 255;
@@ -327,7 +359,9 @@ void hueFlash(int tempColor) {                            //Flashes the hue ligh
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
     }
-    previousColor = tempColor;              
+    previousColor = tempColor;
+    Serial.printf("Flashing yellow.\n");   
+    needHueRestore = true;                       
   }    
   if (tempColor == blue && tempColor != previousColor) {
     hueBright = 255;
@@ -335,15 +369,19 @@ void hueFlash(int tempColor) {                            //Flashes the hue ligh
     for (i=1; i <= 3; i++) {
       setHue(i, true, hueColor, hueBright, 255);
     } 
-    previousColor = tempColor;             
+    previousColor = tempColor;   
+    Serial.printf("Flashing blue.\n");
+    needHueRestore = true;                
   }
-  hueColor = saveColor;
-  hueBright= saveBright;
-  delay(3000);
-  for (i=1; i <= 3; i++) {  
-  setHue(i, hueStatus, hueColor, hueBright, 255);   //reverting back to previous hue settings
+  if (needHueRestore == true) {
+    hueColor = saveColor;
+    hueBright= saveBright;
+    delay(3000);
+    for (i=1; i <= 3; i++) {  
+    setHue(i, hueStatus, hueColor, hueBright, 255);   //reverting hue lights back to previous hue settings    
+    }
+    Serial.printf("Hue lights have been restored to settings prior to flash.\n");
   }
-  Serial.printf("The hues have been reset back to their original values prior to the hueFlash.\n");
 }
 
 int pMeterToBright() {                                    //converts potentiometer readings to brightness for the Hue Light
@@ -377,10 +415,10 @@ void airFreshenerOn() {                                   //turns on the Weemo o
   digitalWrite(encoderPin_G, HIGH);             //Encoder | turning green LED on
   Serial.printf("Wemo has turned on.\n");
   hueStatus = true;
-  hueColor = HueViolet;
+  c = 2; //this is Violet in the hueColorSelect array
   hueBright = 80;
   for (i=1; i <= 3; i++) {
-    setHue(i, hueStatus, hueColor, hueBright, 255);
+    setHue(i, hueStatus, hueColorSelect[c], hueBright, 255);
   }   
   Serial.printf("Turning on the lights for the cat.");
   
