@@ -99,7 +99,7 @@ int previousColor;                //Hue | last hue color
 int hueColorSelect[] = 
 {HueOrange, HueYellow, HueViolet};//Hue | 3 colors to switch between utilizing the longPress
 int c;                            //Hue | c is the color within the hueSelect, can be between 0 and 2
-int hueSaturation;                //Hue | saturation level which is set manually via turning the encoder
+int hueLight;                     //Hue | the currently selected hue lightbulb
 
 bool singleClickState;            //Button | a state that is changed with a single click
 bool doubleClickState;            //Button | a state that is changed with a double click
@@ -110,12 +110,12 @@ int encPosition;                  //Encoder | current position of encoder
 
 // *** Defining objects for the header files below ***
 
-OneButton button1 (encoderPin_Switch, true, true);                                //for Button
-Encoder myEnc (encoderPin_A, encoderPin_B);                                       //for Encoder
-Adafruit_SSD1306 display(screen_Width, screen_Height, &Wire, OLED_Reset);         //for OLED
-Adafruit_NeoPixel pixel (pixel_Count, pixel_Pin, NEO_GRB + NEO_KHZ800);           //for NeoPixels
-Adafruit_BME280 bme;                                                              //for BME
-Wemo myWemo;                                                                      //for Wemo
+OneButton button1 (encoderPin_Switch, true, true);                                              //for Button
+Encoder myEnc (encoderPin_A, encoderPin_B);                                                     //for Encoder
+Adafruit_SSD1306 display(screen_Width, screen_Height, &Wire, OLED_Reset);                       //for OLED
+Adafruit_NeoPixel pixel (pixel_Count, pixel_Pin, NEO_GRB + NEO_KHZ800);                         //for NeoPixels
+Adafruit_BME280 bme;                                                                            //for BME
+Wemo myWemo;                                                                                    //for Wemo
 Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, keypad_Rows, keypad_Cols); //for Keypad
 
 void setup() {
@@ -172,6 +172,7 @@ void setup() {
   delay(1000);
   wemoOn = false;                                           //Ensuring wemoOn is false
   hueStatus = false;                                        //Ensuring hue lights are turned off
+  hueLight = 1;                                             //hueLight will start with first one active
   for (i=1; i <= 3; i++) {
     setHue(i, hueStatus, hueColor, hueBright, 255);
   }    
@@ -202,16 +203,12 @@ void oneClick() {                                         //manually turn on/off
     if (singleClickState == true) {
       Serial.printf("Single click on state.\n");    
       hueStatus = true;
-      for (i=1; i <= 3; i++) {
-        setHue(i, hueStatus, hueColorSelect[c], hueBright, hueSaturation);
-      }    
+      setHue(hueLight, hueStatus, hueColorSelect[c], hueBright, 255);
     }
     if (singleClickState == false) {
       Serial.printf("Single click off state.\n");    
       hueStatus = false;
-      for (i=1; i <= 3; i++) {
-        setHue(i, hueStatus, hueColorSelect[c], hueBright, hueSaturation);
-      }    
+      setHue(hueLight, hueStatus, hueColorSelect[c], hueBright, 255);    
     }    
   }
 }
@@ -237,6 +234,7 @@ void longPress() {                                        //manually change the 
     Serial.printf("Button has been long pressed.\n");    
     longPressState = !longPressState;
     if (longPressState == true) {
+      Serial.printf("Cycling to the next color. Must turn off/on the hue to apply this change.");
       c = c + 1;   //c represents the spot in the array for hueColorSelect
       if (c > 2) { //c can only be 0, 1, or 2
         c = 0;
@@ -254,12 +252,12 @@ void encoderTurn() {                                      //manually change the 
         encPosition = 0;
         Serial.printf("encPosition being set to 0. Do not try to turn below 0.");
       }
-      if (encPosition >= 128) {
-        encPosition = 127;
-        Serial.printf("encPosition being set to 127. Do not try to go beyond 127.");
+      if (encPosition > 99) {
+        encPosition = 99;
+        Serial.printf("encPosition being set to 99. Do not try to go beyond 99.");
       }
-      hueSaturation = map(encPosition,0,127,0,255);
-      Serial.printf("The current hue saturation is: %i.\n", hueSaturation);
+      hueLight = map(encPosition,0,99,1,3);
+      Serial.printf("The current hue lightbulb selected is: %i.\n", hueLight);
       lastPosition = encPosition;
     }  
   }
@@ -301,8 +299,10 @@ bool isKeyUnlocked () {                                   //keypad lock and unlo
       _clearDisplay();
       display.setTextSize(1); // Draw 1X-scale text      
       display.printf("All user input is currently:\n");
-      display.setTextSize(3); // Draw 3X-scale text
-      display.printf("UNLOCKED!");
+      display.setTextSize(2); // Draw 2X-scale text, 3X scale does not fit well with such a long word
+      display.printf("UNLOCKED!\n");
+      display.setTextSize(1);
+      display.printf("Press '#' to lock.");
       executeDisplay(); 
       keyState = true; //this is put in place to keep the above line from spamming
       isLocked = false;

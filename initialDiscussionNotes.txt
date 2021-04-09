@@ -1,0 +1,21 @@
+Sensor to detect when cat enters litterbox and then send a signal to turn on airfreshener
+	Airfreshener = Weemo ON + Wax melter outlet plug
+	Sensor = ultrasonic sensor
+
+Sensor to detect when cat goes to eat her food and turn on soft light
+	hue lights ON, soft violet
+	sensor = ultrasonic sensor
+
+Detect how much water cat has left in her bowl and use the tubing to refill her water bowl /// not enough time/know-how
+
+Pull weather data from online and then light a hue light depending on the temperature outside. Also light neoPixels depending on the rain status. //do not know how, nixed for time
+
+Have the teensy turn on your computer when you press a button //do not know how and does not fit the theme
+
+Allow Hue light to fully controllable manually via the buttons/encoder/potentiometer on the board
+
+Require a password for to access the user manual controls
+
+
+
+^ Above are the notable notes/ideas i discussed with my wife Zoe, my friend Austin, my mom, and Cecilia. Not all are included in the project. 
