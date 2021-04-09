@@ -38,3 +38,6 @@ Can look into more parts: https://www.elegoo.com/products/elegoo-37-in-1-sensor-
 ## Summary
 
 Automated hue lights, automated air-freshener through a Wemo outlet and fully adjustable hue lights through user input on the board.
+
+You can find me on Hackster here: https://www.hackster.io/kalebglodowski .
+And on LinkedIn here: https://www.linkedin.com/in/kalebglodowski/ .
