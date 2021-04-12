@@ -173,6 +173,7 @@ void setup() {
   wemoOn = false;                                           //Ensuring wemoOn is false
   hueStatus = false;                                        //Ensuring hue lights are turned off
   hueLight = 1;                                             //hueLight will start with first one active
+  hueBright = 80;
   for (i=1; i <= 3; i++) {
     setHue(i, hueStatus, hueColor, hueBright, 255);
   }    
@@ -191,7 +192,8 @@ void loop() {
   }
   roomTempDetect();
   isKeyUnlocked();
-  encoderTurn();  
+  encoderTurn();
+  pMeterToBright();  
 }
 
 //******* ALL USER INPUT FUNCTIONS HAVE AN "IF UNLOCKED" PRIOR TO ANY CODE ||| KEYPAD MUST BE USED TO UNLOCK FIRST*******
@@ -433,10 +435,8 @@ void airFreshenerOn() {                                   //turns on the Weemo o
   digitalWrite(encoderPin_G, HIGH);             //Encoder | turning green LED on
   Serial.printf("Wemo has turned on.\n");
   hueStatus = true;
-  c = 2; //this is Violet in the hueColorSelect array
-  hueBright = 80;
   for (i=1; i <= 3; i++) {
-    setHue(i, hueStatus, hueColorSelect[c], hueBright, 255);
+    setHue(i, hueStatus, hueColorSelect[2], hueBright, 255); //hueColorSelect[2] is the purple
   }   
   Serial.printf("Turning on the lights for the cat.");
   
